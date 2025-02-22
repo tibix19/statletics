@@ -5,13 +5,13 @@ FROM node:23-alpine AS builder
 WORKDIR /app-frontend
 
 # Copier package.json (et package-lock.json si présent) depuis statletics-frontend
-COPY statletics-frontend/package*.json ./
+COPY package*.json ./
 
 # Installer les dépendances
 RUN npm ci
 
 # Copier le reste des fichiers
-COPY statletics-frontend/ ./
+COPY . .
 
 # Construire l'application avec npm run build
 RUN npm run build
@@ -21,6 +21,9 @@ FROM nginx:alpine
 
 # Copier le build depuis /app-frontend/dist
 COPY --from=builder /app-frontend/dist /usr/share/nginx/html
+
+# Copier le fichier de configuration nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Exposer le port 80
 EXPOSE 80

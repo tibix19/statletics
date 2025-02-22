@@ -4,7 +4,7 @@ services:
       context: ./statletics-frontend
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - statletics-backend
 
@@ -18,7 +18,7 @@ services:
       - mongodb
 
   mongodb:
-    image: mongo:8.0
+    image: mongo:4.4
     container_name: mongodb
     ports:
       - "27017:27017"

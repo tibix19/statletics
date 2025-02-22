@@ -13,7 +13,7 @@ def get_db():
     Initialise et retourne l'instance de la base de données MongoDB.
     Le connection string est récupéré via l'environnement (MONGO_URI) ou en fallback sur localhost.
     """
-    client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
+    client = MongoClient(os.getenv("MONGO_URI", "mongodb://mongodb:27017"))
     return client.get_database("results_swiss_athletics")
 
 def get_athlete_gender(athlete_name):
