@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-pydantic
 chart
 fastapi_cache
 httpx
