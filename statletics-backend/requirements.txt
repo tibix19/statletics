@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+chart
+fastapi_cache
+httpx
+bs4
+fastapi_cache2
+python-multipart
+pymongo
