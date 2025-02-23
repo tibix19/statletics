@@ -52,7 +52,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            rm -rf /home/timnuc/Documents/statleticsv2/statletics/*
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=60 ${SSH_USER}@${SSH_HOST} "rm -rf /home/timnuc/Documents/statleticsv2/statletics/*"
       
       - name: Transfer files to remote server via SCP
         uses: appleboy/scp-action@master
