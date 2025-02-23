@@ -7,8 +7,9 @@ WORKDIR /app-frontend
 # Copier package.json (et package-lock.json si présent) depuis statletics-frontend
 COPY package*.json ./
 
-# Installer les dépendances
+# Installer les dépendances et mettre à jour les packages npm
 RUN npm ci
+RUN npm update
 
 # Copier le reste des fichiers
 COPY . .
