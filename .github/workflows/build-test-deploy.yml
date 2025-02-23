@@ -8,14 +8,15 @@ jobs:
   connection-test:
     runs-on: ubuntu-latest
     steps:
-    - name: executing remote ssh commands using password
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        password: ${{ secrets.SSH_PASSWORD }}
-        port: ${{ secrets.SSH_PORT }}
-        script: whoami
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Start SSH agent and add key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection established successfully!'"
 
   frontend-build:
     needs: connection-test
@@ -55,36 +56,18 @@ jobs:
     needs: [frontend-build, backend-build]
     runs-on: ubuntu-latest
     steps:
-      - name: Clean remote deployment directory via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=60 ${SSH_USER}@${SSH_HOST} "rm -rf /home/timnuc/Documents/statleticsv2/statletics/*"
-      
-      - name: Transfer files to remote server via SCP
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }} 
-          key: ${{ secrets.SSH_KEY }}
-          source: "."
-          target: "/home/timnuc/Documents/statleticsv2/statletics"
-      
-      - name: Launch containers on remote server via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /home/timnuc/Documents/statleticsv2/statletics
-            docker compose pull
-            docker compose down       # Arrête et supprime les anciens conteneurs
-            docker compose up -d --build
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Deploy application using temporary SSH key file
+        run: |
+          echo -e "${{ secrets.SSH_KEY }}" > __TEMP_INPUT_KEY_FILE
+          chmod 600 __TEMP_INPUT_KEY_FILE
+          # Nettoie le dossier distant
+          ssh -o StrictHostKeyChecking=no -i __TEMP_INPUT_KEY_FILE -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}" "rm -rf /home/timnuc/Documents/statleticsv2/statletics/*"
+          # Transfert l'ensemble des fichiers vers le dossier de déploiement
+          scp -o StrictHostKeyChecking=no -v -i __TEMP_INPUT_KEY_FILE -P "${{ secrets.SSH_PORT }}" -r . "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}":"/home/timnuc/Documents/statleticsv2/statletics"
+          # Lance la mise à jour des containers via Docker Compose
+          ssh -o StrictHostKeyChecking=no -i __TEMP_INPUT_KEY_FILE -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}" "cd /home/timnuc/Documents/statleticsv2/statletics && docker compose pull && docker compose down && docker compose up -d --build"
+          rm __TEMP_INPUT_KEY_FILE
 
