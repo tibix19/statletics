@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-      - run: echo ${{ secrets.SSH_HOST }}
+        run: echo ${{ secrets.SSH_HOST }}
 
 
   frontend-build:
