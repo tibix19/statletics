@@ -10,16 +10,7 @@ jobs:
     steps:
       - name: Checkout code
       - run: echo ${{ secrets.SSH_HOST }}
-      - uses: actions/checkout@v3
-      - name: Test remote SSH connection
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            echo "Connection established"
+
 
   frontend-build:
     needs: connection-test
@@ -28,7 +19,6 @@ jobs:
       image: node:23-alpine
     steps:
       - uses: actions/checkout@v3
-      
       - name: Install dependencies and build frontend
         working-directory: statletics-frontend
         run: |
