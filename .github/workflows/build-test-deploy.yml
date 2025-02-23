@@ -1,20 +1,74 @@
-name: build, test and deploy
+name: Build, Test and Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
 
 jobs:
-  test:
+  frontend-build:
     runs-on: ubuntu-latest
     container:
       image: node:22
     steps:
       - uses: actions/checkout@v3
+      
       - name: Install dependencies and build frontend
         working-directory: statletics-frontend
         run: |
           npm ci
           npm run build
+
+  backend-build:
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.13.2-slim
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install backend dependencies
+        working-directory: statletics-backend
+        run: |
+          pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt
+      - name: Check installed packages
+        working-directory: statletics-backend
+        run: pip check
+
+  deploy:
+    needs: [frontend-build, backend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Clean remote deployment directory via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            rm -rf /home/timnuc/Documents/statleticsv2/statletics/*
+      
+      - name: Transfer files to remote server via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "."
+          target: "/home/timnuc/Documents/statleticsv2/statletics"
+      
+      - name: Launch containers on remote server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /home/timnuc/Documents/statleticsv2/statletics
+            docker compose pull
+            docker compose down       # Arrête et supprime les anciens conteneurs
+            docker compose up -d --build
 

@@ -1,1 +1,1 @@
-# statletics v2 by an athlete
+# statletics v2 by an athlete for athletes
