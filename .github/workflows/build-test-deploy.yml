@@ -30,8 +30,8 @@ jobs:
           apt-get update && \
           apt-get install -y --no-install-recommends build-essential curl && \
           rm -rf /var/lib/apt/lists/*
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          PATH="/root/.cargo/bin:${PATH}"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path && \
+          . /root/.cargo/env && \
           pip install --upgrade pip && \
           pip install --no-cache-dir -r requirements.txt
       - name: Check installed packages
