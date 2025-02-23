@@ -16,7 +16,7 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_KEY }}
       - name: Test SSH connection
         run: |
-          ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection established successfully!'"
+          ssh -v -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection established successfully!'"
 
   frontend-build:
     needs: connection-test
