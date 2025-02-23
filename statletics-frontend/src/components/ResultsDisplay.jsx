@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ResultsTable from './ResultsTable';
 import ResultsChart from './ResultsChart';
 
 function ResultsDisplay({ initialResults }) {
     const navigate = useNavigate();
-    const [allResults, setAllResults] = useState(null);
-    const [displayedData, setDisplayedData] = useState(null);
-    const [uniquePersons, setUniquePersons] = useState([]);
-    const [selectedPerson, setSelectedPerson] = useState(null);
+    const [allResults, setAllResults] = React.useState(null);
+    const [displayedData, setDisplayedData] = React.useState(null);
+    const [uniquePersons, setUniquePersons] = React.useState([]);
+    const [selectedPerson, setSelectedPerson] = React.useState(null);
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (initialResults) {
             handleResults(initialResults);
         }

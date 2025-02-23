@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import SearchForm from './components/SearchForm';
 import ResultsDisplay from './components/ResultsDisplay';
 
 function App() {
-  const [searchResults, setSearchResults] = useState(null);
+  const [searchResults, setSearchResults] = React.useState(null);
 
   const handleResults = (results) => {
     setSearchResults(results);

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 function SearchForm({ onResults }) {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [discipline, setDiscipline] = useState('100'); // valeur par défaut
+    const [searchTerm, setSearchTerm] = React.useState('');
+    const [discipline, setDiscipline] = React.useState('100'); // valeur par défaut
 
     const handleSubmit = async (e) => {
         e.preventDefault();

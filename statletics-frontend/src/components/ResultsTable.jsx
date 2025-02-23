@@ -1,4 +1,4 @@
-import React from 'react';
+// import React from 'react';
 
 function ResultsTable({ results }) {
     if (!results || results.length === 0) return null;

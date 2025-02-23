@@ -1,5 +1,6 @@
-import React from 'react';
+// import React from 'react';
 import { Line } from 'react-chartjs-2';
+import PropTypes from 'prop-types';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -51,7 +52,6 @@ function ResultsChart({ chartData }) {
             y: {
                 reverse: false // Pour le 100m, un temps plus bas est meilleur
             }
-
         }
     };
 
@@ -61,5 +61,12 @@ function ResultsChart({ chartData }) {
         </div>
     );
 }
+
+ResultsChart.propTypes = {
+    chartData: PropTypes.shape({
+        labels: PropTypes.arrayOf(PropTypes.string).isRequired,
+        values: PropTypes.arrayOf(PropTypes.number).isRequired,
+    }).isRequired,
+};
 
 export default ResultsChart;
