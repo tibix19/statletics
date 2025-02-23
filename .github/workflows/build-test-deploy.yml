@@ -5,7 +5,22 @@ on:
     branches: ["main"]
 
 jobs:
+  connection-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Test remote SSH connection
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "Connection established"
+
   frontend-build:
+    needs: connection-test
     runs-on: ubuntu-latest
     container:
       image: node:22
@@ -19,6 +34,7 @@ jobs:
           npm run build
 
   backend-build:
+    needs: connection-test
     runs-on: ubuntu-latest
     container:
       image: python:3.13.2-slim
