@@ -5,21 +5,53 @@ on:
     branches: ["main"]
 
 jobs:
-  deploy:
+  frontend-build:
     runs-on: ubuntu-latest
+    container:
+      image: node:23-alpine
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Deploy application using temporary SSH key file
+      - uses: actions/checkout@v3
+      - name: Install dependencies and build frontend
+        working-directory: statletics-frontend
         run: |
-          echo -e "${{ secrets.SSH_KEY }}" > __TEMP_INPUT_KEY_FILE
-          chmod 600 __TEMP_INPUT_KEY_FILE
-          # Nettoie le dossier distant
-          ssh -o StrictHostKeyChecking=no -i __TEMP_INPUT_KEY_FILE -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}" "rm -rf /home/timnuc/Documents/statleticsv2/statletics/*"
-          # Transfert l'ensemble des fichiers vers le dossier de déploiement
-          scp -o StrictHostKeyChecking=no -v -i __TEMP_INPUT_KEY_FILE -P "${{ secrets.SSH_PORT }}" -r . "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}":"/home/timnuc/Documents/statleticsv2/statletics"
-          # Lance la mise à jour des containers via Docker Compose
-          ssh -o StrictHostKeyChecking=no -i __TEMP_INPUT_KEY_FILE -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}"@"${{ secrets.SSH_HOST }}" "cd /home/timnuc/Documents/statleticsv2/statletics && docker compose pull && docker compose down && docker compose up -d --build"
-          rm __TEMP_INPUT_KEY_FILE
+          npm ci
+          npm run build
+
+  backend-build:
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.13.2-slim
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install backend dependencies
+        working-directory: statletics-backend
+        run: |
+            apt-get update && \
+            apt-get install -y --no-install-recommends build-essential curl && \
+            rm -rf /var/lib/apt/lists/* && \
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path && \
+            export PATH="$HOME/.cargo/bin:$PATH" && \
+            pip install --upgrade pip && \
+            pip install --no-cache-dir -r requirements.txt
+      - name: Check installed packages
+        working-directory: statletics-backend
+        run: pip check
+
+  deploy:
+    needs: [frontend-build, backend-build]
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Synchronize repository to deployment directory
+        run: |
+          rsync -av --delete "$GITHUB_WORKSPACE/" "/home/timnuc/Documents/statleticsv2/statletics/"
+
+      - name: Launch containers locally
+        run: |
+          cd /home/timnuc/Documents/statleticsv2/statletics
+          docker compose pull
+          docker compose down       # Arrête et supprime les anciens conteneurs
+          docker compose up -d --build
+
 
