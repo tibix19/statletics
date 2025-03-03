@@ -3,8 +3,6 @@ services:
     build:
       context: ./statletics-frontend
       dockerfile: Dockerfile
-    env_file:
-      - .env
     ports:
       - "8080:80"
     depends_on:
@@ -14,6 +12,8 @@ services:
     build:
       context: ./statletics-backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     depends_on:
