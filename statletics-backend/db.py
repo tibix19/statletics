@@ -1,6 +1,7 @@
 import os
 from pymongo import MongoClient
 from pymongo import UpdateOne
+from dotenv import load_dotenv
 
 def normalize_name(name: str) -> str:
     """
@@ -13,7 +14,14 @@ def get_db():
     Initialise et retourne l'instance de la base de données MongoDB.
     Le connection string est récupéré via l'environnement (MONGO_URI) ou en fallback sur localhost.
     """
-    client = MongoClient(os.getenv("MONGO_URI", "mongodb://mongodb:27017"))
+    
+    host = os.getenv("MONGO_HOST")
+    port = os.getenv("MONGO_PORT")
+    connection_string = f"mongodb://{host}:{port}"
+    print(f"Connection string: {connection_string}")
+    
+    # client = MongoClient(os.getenv("MONGO_URI", "mongodb://mongodb:27017"))
+    client = MongoClient(connection_string)
     return client.get_database("results_swiss_athletics")
 
 def get_athlete_gender(athlete_name):

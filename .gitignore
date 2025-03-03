@@ -18,3 +18,9 @@ Thumbs.db
 
 # Ignore log files
 *.log
+
+
+# ignore python cache files
+stataletics-backend/venv/
+statletics-backend/__pycache__/
+statletics-backend/*.pyc

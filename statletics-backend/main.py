@@ -18,3 +18,8 @@ app.include_router(router)
 # Pour lancer l'application, depuis le dossier "statletics-backend", utilisez :
 # python -m uvicorn main:app --reload --workers 4
 
+
+# Démarrez MongoDB avec Docker
+# docker start mongodb-4.4
+
+
