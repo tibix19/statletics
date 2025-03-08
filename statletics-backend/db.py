@@ -2,6 +2,11 @@ import os
 from pymongo import MongoClient
 from pymongo import UpdateOne
 from dotenv import load_dotenv
+from pathlib import Path
+from datetime import datetime, timedelta
+
+# Load .env from parent directory
+load_dotenv(Path(__file__).parent.parent / '.env')
 
 def normalize_name(name: str) -> str:
     """
@@ -31,13 +36,37 @@ def get_athlete_gender(athlete_name):
     doc = collection.find_one({"normalized_name": normalized}, {"gender": 1})
     return doc.get("gender") if doc and "gender" in doc else None
 
+def is_data_recent(athlete_name, max_days=2):
+    """
+    Vérifie si les données d'un athlète ont été mises à jour récemment.
+    Retourne True si les données ont été mises à jour dans les derniers 'max_days' jours,
+    False sinon ou si l'athlète n'existe pas dans la base de données.
+    """
+    normalized = normalize_name(athlete_name)
+    db = get_db()
+    collection = db["results"]
+    
+    # Récupérer uniquement le champ last_updated
+    doc = collection.find_one({"normalized_name": normalized}, {"last_updated": 1})
+    
+    if not doc or "last_updated" not in doc:
+        return False
+        
+    last_updated = doc["last_updated"]
+    current_time = datetime.now()
+    time_difference = current_time - last_updated
+    
+    # Vérifier si la mise à jour date de moins de max_days jours
+    return time_difference.days < max_days
+
 def store_results(athlete_name, discipline, new_results):
     """
-    Met à jour (ou insère) le document de l’athlète avec les résultats pour une discipline donnée.
+    Met à jour (ou insère) le document de l'athlète avec les résultats pour une discipline donnée.
     Si le document existe déjà, fusionne les résultats existants pour la discipline :
-      - Mise à jour (remplacement) des résultats existants pour l’année 2025 (basée sur le champ "year")
+      - Mise à jour (remplacement) des résultats existants pour l'année 2025 (basée sur le champ "year")
       - Ajout des nouveaux résultats si non présents
     Le champ "gender" est retiré des sous-documents et stocké uniquement au niveau du document principal.
+    Ajoute également un champ "last_updated" avec la date/heure actuelle.
     """
     normalized = normalize_name(athlete_name)
     db = get_db()
@@ -68,12 +97,16 @@ def store_results(athlete_name, discipline, new_results):
     else:
         merged = clean_results
 
+    # Ajout de la date de dernière mise à jour
+    current_time = datetime.now()
+    
     update_doc = {
         "$set": {
             "athlete_name": athlete_name,
             "gender": gender,
             "normalized_name": normalized,
-            f"results.{discipline}": merged
+            f"results.{discipline}": merged,
+            "last_updated": current_time
         }
     }
     result = collection.update_one({"normalized_name": normalized}, update_doc, upsert=True)

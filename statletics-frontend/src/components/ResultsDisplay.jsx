@@ -42,8 +42,7 @@ function ResultsDisplay({ initialResults }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     athlete_name: person,
-                    search_term: allResults.search_term,
-                    discipline: allResults.discipline  // Ajout du champ discipline
+                    search_term: allResults.search_term
                 }),
             });
 
@@ -94,14 +93,33 @@ function ResultsDisplay({ initialResults }) {
                     </h2>
 
                     {displayedData.results && displayedData.results.length > 0 && (
-                        <div className="overflow-x-auto">
-                            <ResultsTable results={displayedData.results} />
-                        </div>
-                    )}
+                        <div className="space-y-8">
+                            {["100", "200", "300", "400", "600", "800", "HJ"].map(discipline => {
+                                const disciplineResults = displayedData.results.filter(r => r.discipline === discipline);
+                                if (disciplineResults.length === 0) return null;
 
-                    {displayedData.chart_data && (
-                        <div className="mb-8">
-                            <ResultsChart chartData={displayedData.chart_data} />
+                                const disciplineChartData = {
+                                    labels: disciplineResults.map(r => r.date),
+                                    values: disciplineResults.map(r => {
+                                        const [minutes, seconds] = (r.result.includes(':') ? r.result.split(':') : ['0', r.result]);
+                                        return parseFloat(minutes) * 60 + parseFloat(seconds);
+                                    })
+                                };
+
+                                return (
+                                    <div key={discipline} className="bg-gray-50 p-6 rounded-lg">
+                                        <h3 className="text-xl font-semibold mb-4 text-center text-black">
+                                            {discipline === 'HJ' ? 'Saut en hauteur' : `${discipline}m`}
+                                        </h3>
+                                        <div className="overflow-x-auto mb-6">
+                                            <ResultsTable results={disciplineResults} />
+                                        </div>
+                                        <div className="mb-4">
+                                            <ResultsChart chartData={disciplineChartData} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

@@ -1,87 +1,138 @@
 import asyncio
-from fastapi import APIRouter, Request
+import time
+from fastapi import APIRouter, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from scraper import scrape_results_for_gender  # Import absolu
 from chart import build_chart_data
 from datetime import datetime
-from db import store_results, get_athlete_gender, normalize_name, get_db  # Ajout get_db import
+from db import store_results, get_athlete_gender, normalize_name, get_db, is_data_recent  # Ajout is_data_recent import
+from performance_logs import performance_logger  # Import du logger de performance
 
 router = APIRouter()
 
+# Fonction d'arrière-plan pour stocker les résultats dans la base de données
+async def store_results_background(unique_persons, all_results):
+    """Fonction exécutée en arrière-plan pour stocker les résultats dans la base de données"""
+    for athlete in unique_persons:
+        athlete_results_by_discipline = {}
+        # Regrouper les résultats par discipline
+        for result in [r for r in all_results if r["name"] == athlete]:
+            disc = result["discipline"]
+            if disc not in athlete_results_by_discipline:
+                athlete_results_by_discipline[disc] = []
+            athlete_results_by_discipline[disc].append(result)
+        
+        # Stocker les résultats pour chaque discipline
+        for disc, results in athlete_results_by_discipline.items():
+            print(f"[DEBUG] Athlète '{athlete}' a {len(results)} résultats pour discipline '{disc}'")
+            try:
+                store_results(athlete, disc, results)
+            except Exception as e:
+                print(f"Erreur lors de l'enregistrement pour {athlete} (discipline {disc}): {e}")
+
 @router.post("/api/results")
-async def get_results(request: Request):
+async def get_results(request: Request, background_tasks: BackgroundTasks):
     """
     Route principale de recherche qui :
-     1. Récupère les résultats pour hommes et femmes.
+     1. Récupère les résultats pour hommes et femmes pour toutes les disciplines.
      2. Si un seul athlète est trouvé, renvoie ses résultats et les données du graphique.
      3. Si plusieurs athlètes sont trouvés, renvoie la liste des athlètes uniques.
      
-     En plus, pour chaque athlète, les résultats sont enregistrés dans MongoDB
-     par discipline ("100").
+     Les résultats sont envoyés immédiatement au frontend, puis stockés en arrière-plan dans MongoDB.
     """
+    # Démarrer le chronomètre pour mesurer le temps de réponse
+    start_time = time.perf_counter()
+    
     try:
         data = await request.json()
     except Exception:
         return JSONResponse(status_code=400, content={"error": "Invalid JSON body"})
     
     search_term = data.get("search_term")
-    discipline = data.get("discipline")  # Assurez-vous que discipline est présent
     selected_person = data.get("selected_person")  # Optionnel
     
-    if not search_term or not discipline:
-        return JSONResponse(status_code=400, content={"error": "search_term and discipline are required"})
+    if not search_term:
+        return JSONResponse(status_code=400, content={"error": "search_term is required"})
     
-    # Appeler les fonctions de scraping en parallèle pour "MAN" et "WOM"
-    man_results, wom_results = await asyncio.gather(
-        scrape_results_for_gender(request.app, search_term, "MAN", discipline),
-        scrape_results_for_gender(request.app, search_term, "WOM", discipline)
-    )
-    combined_results = man_results + wom_results
-    print(f"[DEBUG] Total results pour '{search_term}' et discipline '{discipline}': {len(combined_results)}")
+    # Liste des disciplines à rechercher
+    disciplines = ["100", "200", "300", "400", "600", "800", "HJ"]
+    
+    all_results = []
+    
+    # Préparer toutes les tâches de scraping pour toutes les disciplines
+    scraping_tasks = []
+    for disc in disciplines:
+        scraping_tasks.extend([
+            scrape_results_for_gender(request.app, search_term, "MAN", disc),
+            scrape_results_for_gender(request.app, search_term, "WOM", disc)
+        ])
+    
+    # Exécuter toutes les requêtes en parallèle
+    all_scraped_results = await asyncio.gather(*scraping_tasks)
+    
+    # Traiter les résultats
+    for i in range(0, len(all_scraped_results), 2):
+        disc = disciplines[i // 2]
+        man_results = all_scraped_results[i]
+        wom_results = all_scraped_results[i + 1]
+        combined_results = man_results + wom_results
+        for result in combined_results:
+            result["discipline"] = disc
+        all_results.extend(combined_results)
+        print(f"[DEBUG] Total results pour '{search_term}' et discipline '{disc}': {len(combined_results)}")
 
-    # Enregistrer par athlète dans la base de données pour la discipline "100"
-    unique_persons = sorted({entry["name"] for entry in combined_results})
-    for athlete in unique_persons:
-        athlete_results = [entry for entry in combined_results if entry["name"] == athlete]
-        print(f"[DEBUG] Athlète '{athlete}' a {len(athlete_results)} résultats")
-        try:
-            store_results(athlete, discipline, athlete_results)
-        except Exception as e:
-            print(f"Erreur lors de l'enregistrement pour {athlete}: {e}")
+    # Identifier les personnes uniques
+    unique_persons = sorted({entry["name"] for entry in all_results})
+    
+    # Planifier le stockage des résultats en arrière-plan
+    background_tasks.add_task(store_results_background, unique_persons, all_results)
 
     if selected_person:
         # Filtrer les résultats pour la personne sélectionnée
-        filtered_results = [entry for entry in combined_results if entry["name"] == selected_person]
+        filtered_results = [entry for entry in all_results if entry["name"] == selected_person]
         try:
             filtered_results.sort(key=lambda x: datetime.strptime(x["date"], "%d.%m.%Y"))
         except Exception:
             pass
         chart_data = build_chart_data(filtered_results)
+        
+        # Calculer le temps écoulé et logger la performance
+        elapsed_time = time.perf_counter() - start_time
+        performance_logger.log_search_performance(search_term, elapsed_time, "/api/results")
+        
         return {
             "search_term": search_term,
             "selected_person": selected_person,
             "results": filtered_results,
             "chart_data": chart_data,
-            "discipline": discipline
+            "all_disciplines": True
         }
     else:
         # S'il y a plusieurs athlètes, renvoyer la liste des athlètes uniques et tous les résultats.
+        
+        # Calculer le temps écoulé et logger la performance
+        elapsed_time = time.perf_counter() - start_time
+        performance_logger.log_search_performance(search_term, elapsed_time, "/api/results")
+        
         return {
             "search_term": search_term,
             "unique_persons": unique_persons,
-            "results": combined_results,
-            "discipline": discipline
+            "results": all_results,
+            "all_disciplines": True
         }
 
 @router.post("/api/athlete-results")
-async def get_athlete_results(request: Request):
+async def get_athlete_results(request: Request, background_tasks: BackgroundTasks):
     """
     Route secondaire pour obtenir les résultats d'un athlète donné.
-    Si l'athlète existe déjà dans la DB, on récupère son genre et on effectue le scraping
-    uniquement pour l'année 2025 avec le genre enregistré.
-    Sinon, on fait le scraping pour les deux genres.
-    Ensuite, on recharge les résultats stockés dans la DB pour éviter d'avoir à cliquer deux fois.
+    Récupère tous les résultats de l'athlète pour toutes les disciplines.
+    Si l'athlète existe déjà dans la DB et que les données datent de moins de 2 jours,
+    on utilise directement les données stockées sans faire de scraping.
+    Sinon, on fait le scraping pour toutes les disciplines.
     """
+    # Démarrer le chronomètre pour mesurer le temps de réponse
+    start_time = time.perf_counter()
+    
     try:
         data = await request.json()
     except Exception:
@@ -89,49 +140,106 @@ async def get_athlete_results(request: Request):
     
     athlete_name = data.get("athlete_name")
     search_term = data.get("search_term")
-    discipline = data.get("discipline")  # Passage de discipline
-    if not athlete_name or not search_term or not discipline:
-        return JSONResponse(status_code=400, content={"error": "athlete_name, search_term and discipline are required"})
+    discipline = data.get("discipline")  # Optionnel, pour filtrer par discipline
+    if not athlete_name or not search_term:
+        return JSONResponse(status_code=400, content={"error": "athlete_name and search_term are required"})
     
+    # Vérifier si les données sont récentes (moins de 2 jours)
+    if is_data_recent(athlete_name):
+        print(f"[DEBUG] Athlète '{athlete_name}' a des données récentes, utilisation directe de la DB")
+        # Utiliser directement les données stockées sans faire de scraping
+        db = get_db()
+        doc = db["results"].find_one({"normalized_name": normalize_name(athlete_name)})
+        
+        # Récupérer tous les résultats pour toutes les disciplines
+        all_results = []
+        if doc and "results" in doc:
+            for disc, results in doc["results"].items():
+                # Ajouter la discipline à chaque résultat
+                for result in results:
+                    result_with_discipline = result.copy()
+                    result_with_discipline["discipline"] = disc
+                    all_results.append(result_with_discipline)
+        
+        try:
+            all_results.sort(key=lambda x: datetime.strptime(x["date"], "%d.%m.%Y"))
+        except Exception:
+            pass
+        
+        chart_data = build_chart_data(all_results)
+        
+        return {
+            "athlete_name": athlete_name,
+            "results": all_results,
+            "chart_data": chart_data,
+            "all_disciplines": True
+        }
+    
+    # Si les données ne sont pas récentes, faire le scraping pour toutes les disciplines
+    disciplines = ["100", "200", "300", "400", "600", "800", "HJ"]
+    all_results = []
     stored_gender = get_athlete_gender(athlete_name)
-    if stored_gender:
-        print(f"[DEBUG] Athlète '{athlete_name}' déjà enregistré avec genre '{stored_gender}'")
-        # Scraper uniquement pour le genre enregistré avec filtre pour l'année 2025
-        results = await scrape_results_for_gender(request.app, search_term, stored_gender, discipline, filter_year=True)
-        combined_results = results
-    else:
-        # Scraper pour les deux genres comme actuellement
-        man_results, wom_results = await asyncio.gather(
-            scrape_results_for_gender(request.app, search_term, "MAN", discipline),
-            scrape_results_for_gender(request.app, search_term, "WOM", discipline)
-        )
-        combined_results = man_results + wom_results
     
-    print(f"[DEBUG] Athlète '{athlete_name}' > résultats récupérés: {len(combined_results)}")
-    # Filtrer en comparant les noms normalisés
-    athlete_results = [r for r in combined_results if normalize_name(r["name"]) == normalize_name(athlete_name)]
-    print(f"[DEBUG] Athlète '{athlete_name}' > résultats filtrés: {len(athlete_results)}")
+    # Préparer toutes les tâches de scraping
+    scraping_tasks = []
+    for disc in disciplines:
+        if stored_gender:
+            print(f"[DEBUG] Athlète '{athlete_name}' déjà enregistré avec genre '{stored_gender}' pour discipline '{disc}'")
+            scraping_tasks.append(scrape_results_for_gender(request.app, search_term, stored_gender, disc, filter_year=True))
+        else:
+            scraping_tasks.extend([
+                scrape_results_for_gender(request.app, search_term, "MAN", disc),
+                scrape_results_for_gender(request.app, search_term, "WOM", disc)
+            ])
     
+    # Exécuter toutes les requêtes en parallèle
+    all_scraped_results = await asyncio.gather(*scraping_tasks)
+    
+    # Traiter les résultats et préparer la réponse immédiate
+    athlete_results_by_discipline = {}
+    
+    for i, results in enumerate(all_scraped_results):
+        disc = disciplines[i if stored_gender else i // 2]
+        combined_results = results if stored_gender else (results + all_scraped_results[i + 1] if i % 2 == 0 else [])
+        
+        # Ajouter la discipline aux résultats
+        for result in combined_results:
+            result["discipline"] = disc
+        
+        # Filtrer en comparant les noms normalisés
+        athlete_results = [r for r in combined_results if normalize_name(r["name"]) == normalize_name(athlete_name)]
+        print(f"[DEBUG] Athlète '{athlete_name}' > résultats récupérés pour discipline '{disc}': {len(athlete_results)}")
+        
+        # Stocker pour traitement en arrière-plan
+        if athlete_results:
+            athlete_results_by_discipline[disc] = athlete_results
+            all_results.extend(athlete_results)
+    
+    # Planifier le stockage en arrière-plan
+    async def store_athlete_results_background():
+        for disc, results in athlete_results_by_discipline.items():
+            try:
+                store_results(athlete_name, disc, results)
+            except Exception as e:
+                print(f"[DEBUG] Erreur lors de l'enregistrement pour {athlete_name} (discipline {disc}): {e}")
+    
+    background_tasks.add_task(store_athlete_results_background)
+    
+    # Trier tous les résultats par date
     try:
-        store_results(athlete_name, discipline, athlete_results)
-    except Exception as e:
-        print(f"[DEBUG] Erreur lors de l'enregistrement pour {athlete_name}: {e}")
-    
-    # Recharger le document de l'athlète depuis la DB pour récupérer les résultats stockés
-    db = get_db()
-    doc = db["results"].find_one({"normalized_name": normalize_name(athlete_name)})
-    # Extraire les résultats pour la discipline "100"
-    stored_results = doc.get("results", {}).get(discipline, []) if doc else []
-    try:
-        stored_results.sort(key=lambda x: datetime.strptime(x["date"], "%d.%m.%Y"))
+        all_results.sort(key=lambda x: datetime.strptime(x["date"], "%d.%m.%Y"))
     except Exception:
         pass
     
-    chart_data = build_chart_data(stored_results)
+    chart_data = build_chart_data(all_results)
+    
+    # Calculer le temps écoulé et logger la performance
+    elapsed_time = time.perf_counter() - start_time
+    performance_logger.log_search_performance(search_term, elapsed_time, "/api/athlete-results")
     
     return {
         "athlete_name": athlete_name,
-        "results": stored_results,
+        "results": all_results,
         "chart_data": chart_data,
-        "discipline": discipline
+        "all_disciplines": True
     }

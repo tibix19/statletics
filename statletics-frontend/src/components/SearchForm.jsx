@@ -2,7 +2,6 @@ import React from 'react';
 
 function SearchForm({ onResults }) {
     const [searchTerm, setSearchTerm] = React.useState('');
-    const [discipline, setDiscipline] = React.useState('100'); // valeur par défaut
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -10,7 +9,7 @@ function SearchForm({ onResults }) {
             const response = await fetch('/api/results', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ search_term: searchTerm, discipline }),
+                body: JSON.stringify({ search_term: searchTerm }),
             });
             const result = await response.json();
             onResults(result);
@@ -29,19 +28,6 @@ function SearchForm({ onResults }) {
                 className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-center text-black"
                 required
             />
-            <select
-                value={discipline}
-                onChange={(e) => setDiscipline(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded text-black"
-            >
-                <option value="100">100</option>
-                <option value="200">200</option>
-                <option value="300">300</option>
-                <option value="400">400</option>
-                <option value="600">600</option>
-                <option value="800">800</option>
-                <option value="HJ">High Jump</option>
-            </select>
             <button type="submit" className="border p-3 rounded hover:bg-blue-500 text-white bg-red-500">
                 Search
             </button>

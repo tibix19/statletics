@@ -2,12 +2,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from config import init_http_client, init_cache
 from routes import router  # Import absolu
+import asyncio
+from scraper import log_worker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: initialize HTTP client and cache
     init_http_client(app)
     init_cache()
+    # Start the log worker
+    asyncio.create_task(log_worker())
     yield
     # Shutdown: close the HTTP client
     await app.state.http_client.aclose()
