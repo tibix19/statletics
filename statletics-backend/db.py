@@ -112,3 +112,88 @@ def store_results(athlete_name, discipline, new_results):
     result = collection.update_one({"normalized_name": normalized}, update_doc, upsert=True)
     print(f"[DEBUG] store_results pour {athlete_name} mise à jour, matched: {result.matched_count}, modified: {result.modified_count}")
     return result.raw_result
+
+def check_search_history(search_term: str):
+    """
+    Vérifie si un terme de recherche existe dans l'historique et retourne des informations sur sa fraîcheur.
+    
+    Args:
+        search_term (str): Le terme de recherche à vérifier
+        
+    Returns:
+        dict: Un dictionnaire contenant:
+            - 'exists' (bool): True si le terme existe dans l'historique
+            - 'age_days' (int): Nombre de jours depuis la dernière recherche
+            - 'same_year' (bool): True si la recherche date de l'année en cours
+            - 'recent' (bool): True si la recherche date de moins de 3 jours
+    """
+    try:
+        db = get_db()
+        collection = db["search_history"]
+        
+        # Rechercher le terme dans l'historique, trié par date décroissante
+        result = collection.find_one(
+            {"search_term": search_term},
+            sort=[("timestamp", -1)]  # -1 pour ordre décroissant (le plus récent d'abord)
+        )
+        
+        current_time = datetime.now()
+        current_year = current_time.year
+        
+        if not result:
+            return {"exists": False, "age_days": None, "same_year": False, "recent": False}
+        
+        last_search_time = result["timestamp"]
+        time_difference = current_time - last_search_time
+        age_days = time_difference.days
+        
+        return {
+            "exists": True,
+            "age_days": age_days,
+            "same_year": last_search_time.year == current_year,
+            "recent": age_days < 3
+        }
+    except Exception as e:
+        print(f"Erreur lors de la vérification de l'historique de recherche: {e}")
+        return {"exists": False, "age_days": None, "same_year": False, "recent": False}
+
+def update_search_history(search_term: str, endpoint: str):
+    """
+    Met à jour l'historique de recherche pour un terme donné.
+    Si le terme existe déjà, met à jour son timestamp, sinon crée une nouvelle entrée.
+    
+    Args:
+        search_term (str): Le terme de recherche utilisé
+        endpoint (str): L'endpoint API qui a été appelé
+    """
+    try:
+        db = get_db()
+        collection = db["search_history"]
+        
+        # Mettre à jour le document s'il existe, sinon en créer un nouveau
+        result = collection.update_one(
+            {"search_term": search_term},
+            {"$set": {"timestamp": datetime.now(), "endpoint": endpoint}},
+            upsert=True
+        )
+        
+        if result.upserted_id:
+            print(f"[DEBUG] Nouveau terme de recherche '{search_term}' enregistré dans search_history, id: {result.upserted_id}")
+        else:
+            print(f"[DEBUG] Terme de recherche '{search_term}' mis à jour dans search_history")
+            
+        return result.upserted_id or True
+    except Exception as e:
+        print(f"Erreur lors de la mise à jour de l'historique de recherche: {e}")
+        return None
+
+def store_search_history(search_term: str, endpoint: str):
+    """
+    Enregistre un terme de recherche dans la collection 'search_history'.
+    Cette fonction est maintenue pour compatibilité, mais update_search_history est préférable.
+    
+    Args:
+        search_term (str): Le terme de recherche utilisé
+        endpoint (str): L'endpoint API qui a été appelé
+    """
+    return update_search_history(search_term, endpoint)

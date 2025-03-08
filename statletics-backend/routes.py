@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from scraper import scrape_results_for_gender  # Import absolu
 from chart import build_chart_data
 from datetime import datetime
-from db import store_results, get_athlete_gender, normalize_name, get_db, is_data_recent  # Ajout is_data_recent import
+from db import store_results, get_athlete_gender, normalize_name, get_db, is_data_recent, store_search_history, check_search_history, update_search_history
 from performance_logs import performance_logger  # Import du logger de performance
 
 router = APIRouter()
@@ -32,15 +32,6 @@ async def store_results_background(unique_persons, all_results):
 
 @router.post("/api/results")
 async def get_results(request: Request, background_tasks: BackgroundTasks):
-    """
-    Route principale de recherche qui :
-     1. Récupère les résultats pour hommes et femmes pour toutes les disciplines.
-     2. Si un seul athlète est trouvé, renvoie ses résultats et les données du graphique.
-     3. Si plusieurs athlètes sont trouvés, renvoie la liste des athlètes uniques.
-     
-     Les résultats sont envoyés immédiatement au frontend, puis stockés en arrière-plan dans MongoDB.
-    """
-    # Démarrer le chronomètre pour mesurer le temps de réponse
     start_time = time.perf_counter()
     
     try:
@@ -54,17 +45,46 @@ async def get_results(request: Request, background_tasks: BackgroundTasks):
     if not search_term:
         return JSONResponse(status_code=400, content={"error": "search_term is required"})
     
+    # Vérifier l'historique des recherches
+    search_history = check_search_history(search_term)
+    print(f"[DEBUG] Historique de recherche pour '{search_term}': {search_history}")
+    
     # Liste des disciplines à rechercher
     disciplines = ["100", "200", "300", "400", "600", "800", "HJ"]
-    
     all_results = []
+    
+    # Si la recherche date de moins de 3 jours, on récupère directement les athlètes depuis la DB
+    if search_history["recent"]:
+        print(f"[DEBUG] Recherche récente pour '{search_term}', utilisation directe de la DB")
+        db = get_db()
+        # Rechercher tous les athlètes dont le nom contient le terme de recherche
+        query = {"athlete_name": {"$regex": search_term, "$options": "i"}}
+        athletes = list(db["results"].find(query, {"athlete_name": 1, "_id": 0}))
+        unique_persons = sorted([athlete["athlete_name"] for athlete in athletes])
+        
+        # Mettre à jour le timestamp dans l'historique
+        update_search_history(search_term, "/api/results")
+        
+        if not unique_persons:
+            # Si aucun athlète n'est trouvé, on fait une recherche complète
+            print(f"[DEBUG] Aucun athlète trouvé en DB pour '{search_term}', recherche complète")
+        else:
+            # Retourner directement la liste des athlètes
+            return {
+                "search_term": search_term,
+                "unique_persons": unique_persons,
+                "all_disciplines": True
+            }
+    
+    # Si la recherche date de cette année mais pas des 3 derniers jours, on fait une recherche pour l'année en cours
+    filter_year = search_history["same_year"] and not search_history["recent"]
     
     # Préparer toutes les tâches de scraping pour toutes les disciplines
     scraping_tasks = []
     for disc in disciplines:
         scraping_tasks.extend([
-            scrape_results_for_gender(request.app, search_term, "MAN", disc),
-            scrape_results_for_gender(request.app, search_term, "WOM", disc)
+            scrape_results_for_gender(request.app, search_term, "MAN", disc, filter_year=filter_year),
+            scrape_results_for_gender(request.app, search_term, "WOM", disc, filter_year=filter_year)
         ])
     
     # Exécuter toutes les requêtes en parallèle
@@ -86,6 +106,9 @@ async def get_results(request: Request, background_tasks: BackgroundTasks):
     
     # Planifier le stockage des résultats en arrière-plan
     background_tasks.add_task(store_results_background, unique_persons, all_results)
+    
+    # Mettre à jour le timestamp dans l'historique
+    update_search_history(search_term, "/api/results")
 
     if selected_person:
         # Filtrer les résultats pour la personne sélectionnée
@@ -123,14 +146,6 @@ async def get_results(request: Request, background_tasks: BackgroundTasks):
 
 @router.post("/api/athlete-results")
 async def get_athlete_results(request: Request, background_tasks: BackgroundTasks):
-    """
-    Route secondaire pour obtenir les résultats d'un athlète donné.
-    Récupère tous les résultats de l'athlète pour toutes les disciplines.
-    Si l'athlète existe déjà dans la DB et que les données datent de moins de 2 jours,
-    on utilise directement les données stockées sans faire de scraping.
-    Sinon, on fait le scraping pour toutes les disciplines.
-    """
-    # Démarrer le chronomètre pour mesurer le temps de réponse
     start_time = time.perf_counter()
     
     try:
@@ -143,6 +158,9 @@ async def get_athlete_results(request: Request, background_tasks: BackgroundTask
     discipline = data.get("discipline")  # Optionnel, pour filtrer par discipline
     if not athlete_name or not search_term:
         return JSONResponse(status_code=400, content={"error": "athlete_name and search_term are required"})
+        
+    # Enregistrer le terme de recherche dans l'historique
+    update_search_history(search_term, "/api/athlete-results")
     
     # Vérifier si les données sont récentes (moins de 2 jours)
     if is_data_recent(athlete_name):
