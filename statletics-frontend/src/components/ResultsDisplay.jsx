@@ -63,20 +63,20 @@ function ResultsDisplay({ initialResults }) {
     };
 
     return (
-        <div className="w-full max-w-7x7">
+        <div className="w-full max-w-7xl mx-auto">
             {uniquePersons.length > 0 && (
-                <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-                    <h2 className="text-2xl font-semibold mb-4 text-center text-black">
+                <div className="bg-white shadow-lg rounded-lg p-4 sm:p-6 mb-6 sm:mb-8">
+                    <h2 className="text-2xl font-semibold mb-4 sm:mb-6 text-center text-black">
                         Choisissez une personne :
                     </h2>
-                    <div className="flex flex-wrap justify-center gap-2">
+                    <div className="flex flex-wrap justify-center gap-3">
                         {uniquePersons.map((person, index) => (
                             <button
                                 key={index}
                                 onClick={() => handlePersonClick(person)}
-                                className={`px-4 py-2 rounded ${selectedPerson === person
-                                    ? 'bg-blue-500'
-                                    : 'bg-gray-200 hover:bg-blue-100'
+                                className={`px-4 py-2 rounded-lg transition-all duration-200 ${selectedPerson === person
+                                    ? 'bg-primary-600 text-white shadow-md'
+                                    : 'bg-gray-100 hover:bg-primary-50 text-gray-800 hover:text-primary-700'
                                     }`}
                             >
                                 {person}
@@ -87,13 +87,13 @@ function ResultsDisplay({ initialResults }) {
             )}
 
             {displayedData && (
-                <div className="bg-white p-6 rounded-lg shadow-lg space-y-6">
-                    <h2 className="text-2xl font-semibold text-center text-black">
+                <div className="bg-white p-4 sm:p-8 rounded-lg shadow-lg space-y-6 sm:space-y-8">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-center text-black">
                         {selectedPerson ? `Résultats pour ${selectedPerson}` : `Résultats pour ${displayedData.selected_person}`}
                     </h2>
 
                     {displayedData.results && displayedData.results.length > 0 && (
-                        <div className="space-y-8">
+                        <div className="space-y-8 sm:space-y-12">
                             {["100", "200", "300", "400", "600", "800", "HJ"].map(discipline => {
                                 const disciplineResults = displayedData.results.filter(r => r.discipline === discipline);
                                 if (disciplineResults.length === 0) return null;
@@ -107,14 +107,14 @@ function ResultsDisplay({ initialResults }) {
                                 };
 
                                 return (
-                                    <div key={discipline} className="bg-gray-50 p-6 rounded-lg">
-                                        <h3 className="text-xl font-semibold mb-4 text-center text-black">
+                                    <div key={discipline} className="bg-gray-50 p-3 sm:p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
+                                        <h3 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-center text-black">
                                             {discipline === 'HJ' ? 'Saut en hauteur' : `${discipline}m`}
                                         </h3>
-                                        <div className="overflow-x-auto mb-6">
+                                        <div className="overflow-x-auto mb-6 sm:mb-8">
                                             <ResultsTable results={disciplineResults} />
                                         </div>
-                                        <div className="mb-4">
+                                        <div className="mb-2 sm:mb-4">
                                             <ResultsChart chartData={disciplineChartData} />
                                         </div>
                                     </div>

@@ -25,19 +25,21 @@ function SearchForm({ onResults }) {
     return (
         <>
             <LoadingOverlay isVisible={isLoading} />
-            <form onSubmit={handleSubmit} className="flex flex-col items-center space-y-3 max-w-md">
-                <input
-                    type="text"
-                    placeholder="Enter a name"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-center text-black"
-                    required
-                    disabled={isLoading}
-                />
+            <form onSubmit={handleSubmit} className="w-full flex flex-col items-center space-y-4">
+                <div className="w-full relative">
+                    <input
+                        type="text"
+                        placeholder="Enter a name"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-center text-black transition-all duration-200 ease-in-out"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
                 <button
                     type="submit"
-                    className="border p-3 rounded hover:bg-blue-500 text-white bg-red-500"
+                    className="px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-md transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed text-black"
                     disabled={isLoading}
                 >
                     Search
