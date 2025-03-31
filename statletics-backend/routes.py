@@ -10,6 +10,46 @@ from performance_logs import performance_logger  # Import du logger de performan
 
 router = APIRouter()
 
+# Liste complète des disciplines
+disciplines_all = [
+    {"code":"50","name":"50"},
+    {"code":"60","name":"60"},
+    {"code":"80","name":"80"},
+    {"code":"100","name":"100m"},
+    {"code":"150","name":"150m"},
+    {"code":"200","name":"200m"},
+    {"code":"300","name":"300m"},
+    {"code":"400","name":"400m"},
+    {"code":"600","name":"600m"},
+    {"code":"800","name":"800m"},
+    {"code":"1K0","name":"1000m"},
+    {"code":"1K5","name":"1500m"},
+    {"code":"MIL","name":"Meile"},
+    {"code":"2K0","name":"2000m"},
+    {"code":"3K0","name":"3000m"},
+    {"code":"5K0","name":"5000m"},
+    {"code":"10K","name":"10000m"},
+    {"code":"11H","name":"110m Hürden"},
+    {"code":"30H","name":"300m Hürden"},
+    {"code":"40H","name":"400m Hürden"},
+    {"code":"3SC","name":"3000m Hindernis"},
+    {"code":"5W","name":"5000m Bahngehen"},
+    {"code":"10W","name":"10000m Bahngehen"},
+    {"code":"HJ","name":"Hochsprung"},
+    {"code":"PV","name":"Stabhochsprung"},
+    {"code":"LJ","name":"Weitsprung"},
+    {"code":"TJ","name":"Dreisprung"},
+    {"code":"SP","name":"Kugelstoss"},
+    {"code":"DT","name":"Diskuswurf"},
+    {"code":"HT","name":"Hammerwurf"},
+    {"code":"JT","name":"Speerwurf"},
+    {"code":"10H","name":"100m Hürden"},
+    {"code":"BAL","name":"Ballwurf"},
+    {"code":"WEZ","name":"Weitsprung Zone"},
+    {"code":"20H","name":"200m Hürden"},
+    {"code":"UKC","name":"UBS Kids Cup"}
+]
+
 # Fonction d'arrière-plan pour stocker les résultats dans la base de données
 async def store_results_background(unique_persons, all_results):
     """Fonction exécutée en arrière-plan pour stocker les résultats dans la base de données"""
@@ -50,7 +90,7 @@ async def get_results(request: Request, background_tasks: BackgroundTasks):
     print(f"[DEBUG] Historique de recherche pour '{search_term}': {search_history}")
     
     # Liste des disciplines à rechercher
-    disciplines = ["100", "200", "300", "400", "600", "800", "HJ"]
+    disciplines = [d["code"] for d in disciplines_all]
     all_results = []
     
     # Si la recherche date de moins de 3 jours, on récupère directement les athlètes depuis la DB
@@ -194,7 +234,7 @@ async def get_athlete_results(request: Request, background_tasks: BackgroundTask
         }
     
     # Si les données ne sont pas récentes, faire le scraping pour toutes les disciplines
-    disciplines = ["100", "200", "300", "400", "600", "800", "HJ"]
+    disciplines = [d["code"] for d in disciplines_all]
     all_results = []
     stored_gender = get_athlete_gender(athlete_name)
     

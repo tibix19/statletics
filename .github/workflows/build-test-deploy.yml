@@ -45,7 +45,7 @@ jobs:
       
       - name: Synchronize repository to deployment directory
         run: |
-          rsync -av --delete --exclude='.env' "$GITHUB_WORKSPACE/" "/home/timnuc/Documents/statleticsv2/statletics/"
+          rsync -av --delete "$GITHUB_WORKSPACE/" "/home/timnuc/Documents/statleticsv2/statletics/"
       
       - name: Launch containers locally
         run: |
