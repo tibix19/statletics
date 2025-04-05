@@ -47,11 +47,19 @@ jobs:
         run: |
           rsync -av --delete "$GITHUB_WORKSPACE/" "/home/timnuc/Documents/statleticsv2/statletics/"
       
+      - name: Setup environment file
+        run: |
+          cd /home/timnuc/Documents/statleticsv2/statletics
+          if [ -f ".env" ]; then
+            rm .env
+          fi
+          cp .env.template .env
+
       - name: Launch containers locally
         run: |
           cd /home/timnuc/Documents/statleticsv2/statletics
           docker compose pull
-          docker compose down       # Arrête et supprime les anciens conteneurs
+          docker compose down
           docker compose up -d --build
 
 
