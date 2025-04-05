@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SearchForm from './components/SearchForm';
 import ResultsDisplay from './components/ResultsDisplay';
 
@@ -20,7 +20,10 @@ function App() {
           <SearchForm onResults={handleResults} />
         </div>
         <div className="mt-8 w-full max-w-7xl mx-auto">
-          <ResultsDisplay initialResults={searchResults} />
+          <Routes>
+            <Route path="/" element={<ResultsDisplay initialResults={searchResults} />} />
+            <Route path="/results/:searchTerm/athlete/:athleteName" element={<ResultsDisplay initialResults={searchResults} />} />
+          </Routes>
         </div>
       </div>
     </BrowserRouter>

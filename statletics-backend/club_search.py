@@ -35,23 +35,28 @@ async def main():
     club_count = 0
     for club_name in clubs:
         club_count += 1
-        print(f"{club_count} Club sélectionné : {club_name}")
+        print(f"{club_count} Club sélectionné : {club_name}")
         print(f"Début du scraping pour {club_name} sur {len(disciplines_all)*2} combinaisons")
         
-        # Créer et lancer en parallèle toutes les tâches de scraping pour ce club
+        # Lancer en parallèle toutes les tâches de scraping pour ce club, en sauvegardant la discipline demandée
         club_tasks = []
+        task_metadata = []  # contient le code de discipline pour chaque tâche
         for disc_obj in disciplines_all:
             disc = disc_obj["code"]
             for gender in ["MAN", "WOM"]:
                 print(f"Lancement du scraping {club_name} - discipline: {disc}, gender: {gender}")
                 club_tasks.append(scrape_results_for_gender(app, club_name, gender, disc))
+                task_metadata.append(disc)
         club_results_list = await asyncio.gather(*club_tasks)
         
-        # Regrouper les résultats par athlète et discipline
-        grouped = {}  # {(athlete, discipline): [results, ...]}
-        for results in club_results_list:
+        # Regrouper les résultats par (athlète, discipline)
+        grouped = {}  # { (athlete, discipline): [results, ...] }
+        for disc, results in zip(task_metadata, club_results_list):
             for res in results:
-                key = (res.get("name"), res.get("discipline"))
+                # S'assurer que le champ discipline est correctement renseigné
+                if not res.get("discipline") or res.get("discipline") == "None":
+                    res["discipline"] = disc
+                key = (res.get("name"), disc)
                 grouped.setdefault(key, []).append(res)
         
         print(f"Scraping terminé pour {club_name}")

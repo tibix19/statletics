@@ -197,3 +197,59 @@ def store_search_history(search_term: str, endpoint: str):
         endpoint (str): L'endpoint API qui a été appelé
     """
     return update_search_history(search_term, endpoint)
+
+def search_athletes(search_term: str, limit: int = 50):
+    """
+    Recherche des athlètes dans la base de données avec une correspondance partielle.
+    
+    Args:
+        search_term (str): Le terme de recherche
+        limit (int): Nombre maximum de résultats à retourner
+    
+    Returns:
+        list: Liste des athlètes correspondants avec leurs informations
+    """
+    db = get_db()
+    collection = db["results"]
+    
+    # Construit un pattern de recherche flexible
+    search_pattern = ''.join(f'.*{c}.*' for c in normalize_name(search_term))
+    
+    # Recherche avec une expression régulière sur le nom normalisé
+    query = {
+        "$or": [
+            {"normalized_name": {"$regex": search_pattern, "$options": "i"}},
+            {"athlete_name": {"$regex": search_term, "$options": "i"}}
+        ]
+    }
+    
+    # Projection pour ne retourner que les champs nécessaires
+    projection = {
+        "athlete_name": 1,
+        "normalized_name": 1,
+        "gender": 1,
+        "last_updated": 1,
+        "_id": 0
+    }
+    
+    return list(collection.find(query, projection).limit(limit))
+
+def get_athlete_results(athlete_name: str):
+    """
+    Récupère tous les résultats d'un athlète.
+    
+    Args:
+        athlete_name (str): Nom de l'athlète
+    
+    Returns:
+        dict: Document complet de l'athlète avec ses résultats
+    """
+    db = get_db()
+    collection = db["results"]
+    return collection.find_one(
+        {"$or": [
+            {"normalized_name": normalize_name(athlete_name)},
+            {"athlete_name": athlete_name}
+        ]},
+        {"_id": 0}
+    )

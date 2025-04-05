@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from scraper import scrape_results_for_gender  # Import absolu
 from chart import build_chart_data
 from datetime import datetime
-from db import store_results, get_athlete_gender, normalize_name, get_db, is_data_recent, store_search_history, check_search_history, update_search_history
+from db import store_results, get_athlete_gender, normalize_name, get_db, is_data_recent, store_search_history, check_search_history, update_search_history, search_athletes, get_athlete_results as fetch_athlete_results
 from performance_logs import performance_logger  # Import du logger de performance
 
 router = APIRouter()
@@ -80,10 +80,28 @@ async def get_results(request: Request, background_tasks: BackgroundTasks):
         return JSONResponse(status_code=400, content={"error": "Invalid JSON body"})
     
     search_term = data.get("search_term")
-    selected_person = data.get("selected_person")  # Optionnel
     
     if not search_term:
         return JSONResponse(status_code=400, content={"error": "search_term is required"})
+    
+    # Rechercher d'abord dans la base de données
+    athletes = search_athletes(search_term)
+    
+    if athletes:
+        # Mettre à jour l'historique de recherche
+        update_search_history(search_term, "/api/results")
+        
+        # Retourner la liste des athlètes trouvés
+        unique_persons = sorted(set(athlete["athlete_name"] for athlete in athletes))
+        
+        return {
+            "search_term": search_term,
+            "unique_persons": unique_persons,
+            "from_database": True
+        }
+    
+    # Si aucun résultat en base, faire le scraping comme avant
+    selected_person = data.get("selected_person")  # Optionnel
     
     # Vérifier l'historique des recherches
     search_history = check_search_history(search_term)
@@ -195,13 +213,44 @@ async def get_athlete_results(request: Request, background_tasks: BackgroundTask
     
     athlete_name = data.get("athlete_name")
     search_term = data.get("search_term")
-    discipline = data.get("discipline")  # Optionnel, pour filtrer par discipline
+    
     if not athlete_name or not search_term:
         return JSONResponse(status_code=400, content={"error": "athlete_name and search_term are required"})
-        
-    # Enregistrer le terme de recherche dans l'historique
+    
+    # Enregistrer la recherche dans l'historique
     update_search_history(search_term, "/api/athlete-results")
     
+    # Récupérer les résultats depuis la base de données
+    athlete_doc = fetch_athlete_results(athlete_name)
+    
+    if athlete_doc and "results" in athlete_doc:
+        # Reformater les résultats pour le frontend
+        all_results = []
+        for discipline, results in athlete_doc["results"].items():
+            for result in results:
+                result_with_discipline = result.copy()
+                result_with_discipline["discipline"] = discipline
+                all_results.append(result_with_discipline)
+        
+        try:
+            all_results.sort(key=lambda x: datetime.strptime(x["date"], "%d.%m.%Y"))
+        except Exception as e:
+            print(f"Erreur lors du tri des résultats : {e}")
+        
+        chart_data = build_chart_data(all_results)
+        
+        # Calculer et logger le temps de réponse
+        elapsed_time = time.perf_counter() - start_time
+        performance_logger.log_search_performance(search_term, elapsed_time, "/api/athlete-results")
+        
+        return {
+            "athlete_name": athlete_name,
+            "results": all_results,
+            "chart_data": chart_data,
+            "from_database": True
+        }
+    
+    # Si l'athlète n'est pas trouvé en base, faire le scraping comme avant
     # Vérifier si les données sont récentes (moins de 2 jours)
     if is_data_recent(athlete_name):
         print(f"[DEBUG] Athlète '{athlete_name}' a des données récentes, utilisation directe de la DB")

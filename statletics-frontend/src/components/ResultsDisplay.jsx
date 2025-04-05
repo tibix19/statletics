@@ -57,23 +57,24 @@ function ResultsDisplay({ initialResults }) {
 
     const handleResults = (result) => {
         console.log('Structure complète des résultats reçus:', result);
+        setAllResults(result);
 
         if (result.unique_persons) {
             console.log('Plusieurs personnes trouvées:', result.unique_persons);
             setUniquePersons(result.unique_persons);
             setDisplayedData(null);
             setSelectedPerson(null);
-            setAllResults(result);
-        } else {
+        } else if (result.results) {
             console.log('Résultats directs reçus:', result);
-            setAllResults(result);
             setDisplayedData(result);
+            setSelectedPerson(result.athlete_name || result.selected_person);
             setUniquePersons([]);
         }
     };
 
     const handlePersonClick = async (person) => {
         console.log('Clicking person:', person);
+        setSelectedPerson(person); // Mise à jour immédiate de la sélection
 
         try {
             const response = await fetch('/api/athlete-results', {
@@ -92,12 +93,17 @@ function ResultsDisplay({ initialResults }) {
             const result = await response.json();
             console.log('Received athlete results:', result);
 
-            setDisplayedData(result);
-            setSelectedPerson(person);
+            // Mise à jour des données affichées
+            setDisplayedData({
+                ...result,
+                selected_person: person
+            });
 
+            // Mise à jour de l'URL
             navigate(`/results/${encodeURIComponent(allResults.search_term)}/athlete/${encodeURIComponent(person)}`);
         } catch (error) {
             console.error('Error fetching athlete results:', error);
+            setSelectedPerson(null); // Réinitialiser en cas d'erreur
         }
     };
 
@@ -114,8 +120,8 @@ function ResultsDisplay({ initialResults }) {
                                 key={index}
                                 onClick={() => handlePersonClick(person)}
                                 className={`px-4 py-2 rounded-lg transition-all duration-200 ${selectedPerson === person
-                                    ? 'bg-primary-600 text-white shadow-md'
-                                    : 'bg-gray-100 hover:bg-primary-50 text-gray-800 hover:text-primary-700'
+                                        ? 'bg-primary-600 text-white shadow-md'
+                                        : 'bg-gray-100 hover:bg-primary-50 text-gray-800 hover:text-primary-700'
                                     }`}
                             >
                                 {person}
@@ -142,7 +148,7 @@ function ResultsDisplay({ initialResults }) {
                                     values: disciplineResults.map(r => {
                                         // For field events like jumps and throws, we don't need to convert to seconds
                                         const isFieldEvent = ["HJ", "PV", "LJ", "TJ", "SP", "DT", "HT", "JT", "BAL", "WEZ"].includes(discipline.code);
-                                        
+
                                         if (isFieldEvent) {
                                             return parseFloat(r.result.replace(',', '.'));
                                         } else {
