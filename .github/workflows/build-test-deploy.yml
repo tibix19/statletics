@@ -53,7 +53,7 @@ jobs:
           if [ -f ".env" ]; then
             rm .env
           fi
-          cp .env.template .env
+          mv .env.template .env
 
       - name: Launch containers locally
         run: |

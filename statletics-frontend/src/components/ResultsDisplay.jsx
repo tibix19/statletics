@@ -56,7 +56,7 @@ function ResultsDisplay({ initialResults }) {
     }, [initialResults]);
 
     const handleResults = (result) => {
-        console.log('Structure complète des résultats reçus:', result);
+        // console.log('Structure complète des résultats reçus:', result);
         setAllResults(result);
 
         if (result.unique_persons) {
@@ -65,7 +65,7 @@ function ResultsDisplay({ initialResults }) {
             setDisplayedData(null);
             setSelectedPerson(null);
         } else if (result.results) {
-            console.log('Résultats directs reçus:', result);
+            // console.log('Résultats directs reçus:', result);
             setDisplayedData(result);
             setSelectedPerson(result.athlete_name || result.selected_person);
             setUniquePersons([]);
@@ -120,8 +120,8 @@ function ResultsDisplay({ initialResults }) {
                                 key={index}
                                 onClick={() => handlePersonClick(person)}
                                 className={`px-4 py-2 rounded-lg transition-all duration-200 ${selectedPerson === person
-                                        ? 'bg-primary-600 text-white shadow-md'
-                                        : 'bg-gray-100 hover:bg-primary-50 text-gray-800 hover:text-primary-700'
+                                    ? 'bg-primary-600 text-white shadow-md'
+                                    : 'bg-gray-100 hover:bg-primary-50 text-gray-800 hover:text-primary-700'
                                     }`}
                             >
                                 {person}

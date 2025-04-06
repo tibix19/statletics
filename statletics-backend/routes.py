@@ -87,6 +87,15 @@ async def get_results(request: Request, background_tasks: BackgroundTasks):
     # Rechercher d'abord dans la base de données
     athletes = search_athletes(search_term)
     
+    # If no athletes found in the database, do not proceed with scraping.
+    if not athletes:
+        return {
+            "search_term": search_term,
+            "unique_persons": [],
+            "results": [],
+            "message": "Aucun athlète trouvé"
+        }
+    
     if athletes:
         # Mettre à jour l'historique de recherche
         update_search_history(search_term, "/api/results")
